@@ -1,0 +1,44 @@
+version: '3'
+
+services:
+  traefik:
+    image: traefik
+    command: --api --docker
+    container_name: traefik
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      - web
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PWD}/traefik.toml:/traefik.toml
+      - ${PWD}/acme.json:/acme.json
+    labels:
+      - "traefik.frontend.rule=Host:traefik.${TRAEFIK_HOSTNAME}"
+      - "traefik.port=8080"
+      - "traefik.frontend.auth.basic=${TRAEFIK_AUTH}"
+
+  portainer:
+    image: portainer/portainer
+    container_name: portainer
+    restart: always
+    networks:
+      - web
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data 
+    labels:
+      - "traefik.docker.network=web"
+      - "traefik.enable=true"
+      - "traefik.frontend.rule=Host:portainer.${TRAEFIK_HOSTNAME}"
+      - "traefik.port=9000"
+
+volumes:
+  portainer_data:
+
+networks:
+  web:
+    external:
+      name: web
