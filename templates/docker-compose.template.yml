@@ -13,8 +13,8 @@ services:
       - web
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${PWD}/traefik.toml:/traefik.toml
-      - ${PWD}/acme.json:/acme.json
+      - ${PWD}/stack/traefik.toml:/traefik.toml
+      - ${PWD}/stack/acme.json:/acme.json
     labels:
       - "traefik.frontend.rule=Host:traefik.${TRAEFIK_HOSTNAME}"
       - "traefik.port=8080"
