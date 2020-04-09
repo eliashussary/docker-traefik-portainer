@@ -1,24 +1,45 @@
-version: '3'
+version: "3"
 
 services:
   traefik:
-    image: traefik
-    command: --api --docker
-    container_name: traefik
-    restart: always
-    ports:
-      - 80:80
-      - 443:443
+    image: "traefik:v2.0"
+    container_name: "traefik"
     networks:
       - web
+    command:
+      - "--log.level=ERROR"
+      - "--api"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.traefik.acme.httpchallenge=true"
+      - "--certificatesresolvers.traefik.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.traefik.acme.email=${TRAEFIK_ACME_EMAIL}"
+      - "--certificatesresolvers.traefik.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${PWD}/stack/traefik.toml:/traefik.toml
-      - ${PWD}/stack/acme.json:/acme.json
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
     labels:
-      - "traefik.frontend.rule=Host:traefik.${TRAEFIK_HOSTNAME}"
-      - "traefik.port=8080"
-      - "traefik.frontend.auth.basic=${TRAEFIK_AUTH}"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${TRAEFIK_HOSTNAME}`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.tls.certresolver=traefik"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.middlewares=auth"
+
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_AUTH}"
+      - "traefik.http.middlewares.auth.basicauth.headerField=X-WebAuth-User"
+
+      # global redirect to https
+      - "traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall.entrypoints=web"
+      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
+
+      # middleware redirect
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
 
   portainer:
     image: portainer/portainer
@@ -28,12 +49,14 @@ services:
       - web
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data 
+      - portainer_data:/data
     labels:
-      - "traefik.docker.network=web"
       - "traefik.enable=true"
-      - "traefik.frontend.rule=Host:portainer.${TRAEFIK_HOSTNAME}"
-      - "traefik.port=9000"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.${TRAEFIK_HOSTNAME}`)"
+      - "traefik.http.routers.portainer.tls.certresolver=traefik"
+      - "traefik.http.routers.portainer.tls=true"
 
 volumes:
   portainer_data:
